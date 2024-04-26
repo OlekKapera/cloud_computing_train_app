@@ -1,4 +1,4 @@
-package com.aleksanderkapera.train_app
+package com.example.train_app
 
 import io.flutter.embedding.android.FlutterActivity
 
