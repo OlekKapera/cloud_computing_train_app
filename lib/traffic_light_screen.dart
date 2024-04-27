@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:arkit_plugin/arkit_plugin.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:train_app/model.dart';
 import 'package:vector_math/vector_math_64.dart' as vector;
 
 class TrafficLightScreen extends StatefulWidget {
@@ -13,7 +16,7 @@ class TrafficLightScreen extends StatefulWidget {
 class TrafficLightScreenState extends State<TrafficLightScreen> {
   late ARKitController arkitController;
   ARKitReferenceNode? node;
-  bool idle = true;
+  Model model = Model.green;
 
   @override
   void dispose() {
@@ -25,17 +28,12 @@ class TrafficLightScreenState extends State<TrafficLightScreen> {
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('Custom Animation')),
         floatingActionButton: FloatingActionButton(
-          child: Icon(idle ? Icons.play_arrow : Icons.stop),
+          child: const Icon(Icons.navigate_next),
           onPressed: () async {
-            if (idle) {
-              await arkitController.playAnimation(
-                  key: 'transform',
-                  sceneName: 'Models.scnassets/traffic_light.usdz',
-                  animationIdentifier: 'transform');
-            } else {
-              await arkitController.stopAnimation(key: 'transform');
-            }
-            setState(() => idle = !idle);
+            setState(() {
+              model = model.next();
+              _updateNode();
+            });
           },
         ),
         body: ARKitSceneView(
@@ -53,6 +51,9 @@ class TrafficLightScreenState extends State<TrafficLightScreen> {
     this.arkitController.onAddNodeForAnchor = _handleAddAnchor;
     this.arkitController.onNodePinch = (pinch) => _onPinchHandler(pinch);
     this.arkitController.onNodePan = (pan) => _onPanHandler(pan);
+    this.arkitController.onUpdateNodeForAnchor = (anchor) {
+      print(anchor);
+    };
     // this.arkitController.onNodeRotation =
     //     (rotation) => _onRotationHandler(rotation);
   }
@@ -69,11 +70,38 @@ class TrafficLightScreenState extends State<TrafficLightScreen> {
       controller?.remove(node!.name);
     }
     node = ARKitReferenceNode(
-      url: 'Models.scnassets/traffic_light.usdz',
+      url: model.path,
       position: vector.Vector3(0, 0, 0),
       scale: vector.Vector3(0.002, 0.002, 0.002),
+      eulerAngles: vector.Vector3(0, -math.pi / 2, 0),
     );
     controller?.add(node!, parentNodeName: anchor.nodeName);
+  }
+
+  void _updateNode() {
+    ARKitReferenceNode? node = this.node;
+    if (node == null) {
+      return;
+    }
+
+    arkitController.remove(node.name);
+
+    node = ARKitReferenceNode(
+      url: model.path,
+      position: node.position,
+      scale: node.scale,
+      eulerAngles: node.eulerAngles,
+      light: node.light,
+      name: node.name,
+      physicsBody: node.physicsBody,
+      renderingOrder: node.renderingOrder,
+      isHidden: node.isHidden.value,
+    );
+
+    this.node = node;
+    arkitController.add(node);
+
+    // arkitController.update(node.name, node: node);
   }
 
   void _onPinchHandler(List<ARKitNodePinchResult> pinch) {
