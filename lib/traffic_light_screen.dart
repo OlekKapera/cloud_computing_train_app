@@ -11,7 +11,7 @@ import 'package:ar_flutter_plugin_flutterflow/models/ar_hittest_result.dart';
 import 'package:ar_flutter_plugin_flutterflow/models/ar_node.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
-import 'package:vector_math/vector_math_64.dart';
+import 'package:vector_math/vector_math_64.dart' as v;
 
 class ObjectGesturesWidget extends StatefulWidget {
   const ObjectGesturesWidget({super.key});
@@ -28,6 +28,8 @@ class ObjectGesturesWidgetState extends State<ObjectGesturesWidget> {
   List<ARNode> nodes = [];
   List<ARAnchor> anchors = [];
 
+  final TextEditingController _controller = TextEditingController(text: "");
+
   @override
   void dispose() {
     super.dispose();
@@ -38,24 +40,56 @@ class ObjectGesturesWidgetState extends State<ObjectGesturesWidget> {
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
-          title: const Text('Object Transformation Gestures'),
+          title: const Text('Train App'),
         ),
-        body: Stack(children: [
-          ARView(
-            onARViewCreated: onARViewCreated,
-            planeDetectionConfig: PlaneDetectionConfig.horizontalAndVertical,
-          ),
-          Align(
-            alignment: FractionalOffset.bottomCenter,
-            child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                      onPressed: onRemoveEverything,
-                      child: const Text("Remove Everything")),
-                ]),
-          )
-        ]));
+        body: Column(
+          children: [
+            Row(
+              children: [
+                const SizedBox(width: 32),
+                const Text("Next station: "),
+                const SizedBox(width: 64),
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    decoration: InputDecoration.collapsed(
+                      hintText: "UnionSquare-1A",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16.0),
+                      ),
+                      filled: true,
+                    ),
+                    textAlign: TextAlign.center,
+                    onSubmitted: (text) {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 32),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: Stack(children: [
+                ARView(
+                  onARViewCreated: onARViewCreated,
+                  planeDetectionConfig:
+                      PlaneDetectionConfig.horizontalAndVertical,
+                ),
+                Align(
+                  alignment: FractionalOffset.bottomCenter,
+                  child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        ElevatedButton(
+                            onPressed: onRemoveEverything,
+                            child: const Text("Remove Everything")),
+                      ]),
+                )
+              ]),
+            ),
+          ],
+        ));
   }
 
   void onARViewCreated(
@@ -108,10 +142,10 @@ class ObjectGesturesWidgetState extends State<ObjectGesturesWidget> {
         // Add note to anchor
         var newNode = ARNode(
             type: NodeType.localGLTF2,
-            uri: "Models/red.gltf",
-            scale: Vector3(0.2, 0.2, 0.2),
-            position: Vector3(0.0, 0.0, 0.0),
-            rotation: Vector4(1.0, 0.0, 0.0, 0.0));
+            uri: "Models/orange.gltf",
+            scale: v.Vector3(0.2, 0.2, 0.2),
+            position: v.Vector3(0.0, 0.0, 0.0),
+            rotation: v.Vector4(1.0, 0.0, 0.0, 0.0));
         bool? didAddNodeToAnchor =
             await arObjectManager?.addNode(newNode, planeAnchor: newAnchor);
         if (didAddNodeToAnchor == true) {
