@@ -43,63 +43,76 @@ class ObjectGesturesWidgetState extends State<ObjectGesturesWidget> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-          title: const Text('Train App'),
-        ),
-        body: Column(
-          children: [
-            Row(
-              children: [
-                const SizedBox(width: 32),
-                const Text("Next station: "),
-                const SizedBox(width: 64),
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: InputDecoration.collapsed(
-                      hintText: "UnionSquare-1A",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16.0),
-                      ),
-                      filled: true,
+      appBar: AppBar(
+        title: const Text('Train App'),
+      ),
+      floatingActionButton: IconButton(
+        icon: const Icon(Icons.refresh),
+        onPressed: () {
+          _getDataFromCloud();
+        },
+      ),
+      body: Column(
+        children: [
+          Row(
+            children: [
+              const SizedBox(width: 32),
+              const Text("Next station: "),
+              const SizedBox(width: 64),
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  decoration: InputDecoration.collapsed(
+                    hintText: "UnionSquare-1A",
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16.0),
                     ),
-                    textAlign: TextAlign.center,
-                    onSubmitted: (text) {
-                      _getDataFromCloud();
-                      FocusManager.instance.primaryFocus?.unfocus();
-                    },
+                    filled: true,
                   ),
+                  textAlign: TextAlign.center,
+                  onSubmitted: (text) {
+                    _getDataFromCloud();
+                    FocusManager.instance.primaryFocus?.unfocus();
+                  },
                 ),
-                const SizedBox(width: 32),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Flexible(
-              child: Stack(children: [
-                ARView(
-                  onARViewCreated: onARViewCreated,
-                  planeDetectionConfig:
-                      PlaneDetectionConfig.horizontalAndVertical,
-                ),
-                Align(
-                  alignment: FractionalOffset.bottomCenter,
-                  child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ElevatedButton(
-                            onPressed: onRemoveEverything,
-                            child: const Text("Remove Everything")),
-                      ]),
-                )
-              ]),
-            ),
-          ],
-        ));
+              ),
+              const SizedBox(width: 32),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Flexible(
+            child: Stack(children: [
+              ARView(
+                onARViewCreated: onARViewCreated,
+                planeDetectionConfig:
+                    PlaneDetectionConfig.horizontalAndVertical,
+              ),
+              Align(
+                alignment: FractionalOffset.bottomCenter,
+                child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton(
+                          onPressed: onRemoveEverything,
+                          child: const Text("Remove Everything")),
+                    ]),
+              )
+            ]),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _getDataFromCloud() async {
     final dio = Dio();
     final inputText = _controller.text;
+    if (inputText.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Fill in the station")));
+      return;
+    }
+
     final response = await dio.get(
         'https://us-east1-trainapi-422319.cloudfunctions.net/train-service-dev-first/$inputText');
     print(response);
@@ -112,6 +125,15 @@ class ObjectGesturesWidgetState extends State<ObjectGesturesWidget> {
 
     setState(() {
       isObstacleAhead = response.data["hasObstacle"];
+
+      final newNodes = List.of(nodes);
+      for (final node in newNodes) {
+        node.uri = !isObstacleAhead ? "Models/red.gltf" : "Models/green.gltf";
+        arObjectManager?.removeNode(node);
+        arObjectManager?.addNode(node,
+            planeAnchor: anchors.firstOrNull as ARPlaneAnchor?);
+      }
+      nodes = newNodes;
     });
   }
 
@@ -124,32 +146,34 @@ class ObjectGesturesWidgetState extends State<ObjectGesturesWidget> {
     this.arObjectManager = arObjectManager;
     this.arAnchorManager = arAnchorManager;
 
-    this.arSessionManager!.onInitialize(
+    this.arSessionManager?.onInitialize(
           showFeaturePoints: false,
           showPlanes: false,
           showWorldOrigin: false,
           handlePans: true,
           handleRotation: true,
         );
-    this.arObjectManager!.onInitialize();
+    this.arObjectManager?.onInitialize();
 
-    this.arSessionManager!.onPlaneOrPointTap = onPlaneOrPointTapped;
-    this.arObjectManager!.onPanStart = onPanStarted;
-    this.arObjectManager!.onPanChange = onPanChanged;
-    this.arObjectManager!.onPanEnd = onPanEnded;
-    this.arObjectManager!.onRotationStart = onRotationStarted;
-    this.arObjectManager!.onRotationChange = onRotationChanged;
-    this.arObjectManager!.onRotationEnd = onRotationEnded;
+    this.arSessionManager?.onPlaneOrPointTap = onPlaneOrPointTapped;
+    this.arObjectManager?.onPanStart = onPanStarted;
+    this.arObjectManager?.onPanChange = onPanChanged;
+    this.arObjectManager?.onPanEnd = onPanEnded;
+    this.arObjectManager?.onRotationStart = onRotationStarted;
+    this.arObjectManager?.onRotationChange = onRotationChanged;
+    this.arObjectManager?.onRotationEnd = onRotationEnded;
   }
 
   Future<void> onRemoveEverything() async {
-    /*nodes.forEach((node) {
-      this.arObjectManager.removeNode(node);
-    });*/
+    for (final node in nodes) {
+      arObjectManager?.removeNode(node);
+    }
+
     for (final anchor in anchors) {
       arAnchorManager?.removeAnchor(anchor);
     }
     anchors = [];
+    nodes = [];
   }
 
   Future<void> onPlaneOrPointTapped(
@@ -174,10 +198,10 @@ class ObjectGesturesWidgetState extends State<ObjectGesturesWidget> {
         if (didAddNodeToAnchor == true) {
           nodes.add(newNode);
         } else {
-          arSessionManager?.onError!("Adding Node to Anchor failed");
+          arSessionManager?.onError?.call("Adding Node to Anchor failed");
         }
       } else {
-        arSessionManager?.onError!("Adding Anchor failed");
+        arSessionManager?.onError?.call("Adding Anchor failed");
       }
     }
   }
