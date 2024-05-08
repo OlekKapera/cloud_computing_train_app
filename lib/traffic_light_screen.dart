@@ -128,7 +128,7 @@ class ObjectGesturesWidgetState extends State<ObjectGesturesWidget> {
 
       final newNodes = List.of(nodes);
       for (final node in newNodes) {
-        node.uri = !isObstacleAhead ? "Models/red.gltf" : "Models/green.gltf";
+        node.uri = isObstacleAhead ? "Models/red.gltf" : "Models/green.gltf";
         arObjectManager?.removeNode(node);
         arObjectManager?.addNode(node,
             planeAnchor: anchors.firstOrNull as ARPlaneAnchor?);
