@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>WE NEED CAMERA</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>WE NEED THIS TOO</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

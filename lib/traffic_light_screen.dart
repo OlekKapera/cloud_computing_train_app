@@ -1,134 +1,166 @@
-import 'dart:math' as math;
-
-import 'package:arkit_plugin/arkit_plugin.dart';
+import 'package:ar_flutter_plugin_flutterflow/ar_flutter_plugin.dart';
+import 'package:ar_flutter_plugin_flutterflow/datatypes/config_planedetection.dart';
+import 'package:ar_flutter_plugin_flutterflow/datatypes/hittest_result_types.dart';
+import 'package:ar_flutter_plugin_flutterflow/datatypes/node_types.dart';
+import 'package:ar_flutter_plugin_flutterflow/managers/ar_anchor_manager.dart';
+import 'package:ar_flutter_plugin_flutterflow/managers/ar_location_manager.dart';
+import 'package:ar_flutter_plugin_flutterflow/managers/ar_object_manager.dart';
+import 'package:ar_flutter_plugin_flutterflow/managers/ar_session_manager.dart';
+import 'package:ar_flutter_plugin_flutterflow/models/ar_anchor.dart';
+import 'package:ar_flutter_plugin_flutterflow/models/ar_hittest_result.dart';
+import 'package:ar_flutter_plugin_flutterflow/models/ar_node.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
-import 'package:train_app/model.dart';
-import 'package:vector_math/vector_math_64.dart' as vector;
+import 'package:vector_math/vector_math_64.dart';
 
-class TrafficLightScreen extends StatefulWidget {
-  const TrafficLightScreen({super.key});
+class ObjectGesturesWidget extends StatefulWidget {
+  const ObjectGesturesWidget({super.key});
 
   @override
-  TrafficLightScreenState createState() => TrafficLightScreenState();
+  ObjectGesturesWidgetState createState() => ObjectGesturesWidgetState();
 }
 
-class TrafficLightScreenState extends State<TrafficLightScreen> {
-  late ARKitController arkitController;
-  ARKitReferenceNode? node;
-  Model model = Model.green;
+class ObjectGesturesWidgetState extends State<ObjectGesturesWidget> {
+  ARSessionManager? arSessionManager;
+  ARObjectManager? arObjectManager;
+  ARAnchorManager? arAnchorManager;
+
+  List<ARNode> nodes = [];
+  List<ARAnchor> anchors = [];
 
   @override
   void dispose() {
-    arkitController.dispose();
     super.dispose();
+    arSessionManager!.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Custom Animation')),
-        floatingActionButton: FloatingActionButton(
-          child: const Icon(Icons.navigate_next),
-          onPressed: () async {
-            setState(() {
-              model = model.next();
-              _updateNode();
-            });
-          },
+  Widget build(BuildContext context) {
+    return Scaffold(
+        appBar: AppBar(
+          title: const Text('Object Transformation Gestures'),
         ),
-        body: ARKitSceneView(
-          showFeaturePoints: true,
-          enablePanRecognizer: true,
-          enablePinchRecognizer: true,
-          enableRotationRecognizer: true,
-          planeDetection: ARPlaneDetection.horizontal,
-          onARKitViewCreated: onARKitViewCreated,
-        ),
-      );
-
-  void onARKitViewCreated(ARKitController arkitController) {
-    this.arkitController = arkitController;
-    this.arkitController.onAddNodeForAnchor = _handleAddAnchor;
-    this.arkitController.onNodePinch = (pinch) => _onPinchHandler(pinch);
-    this.arkitController.onNodePan = (pan) => _onPanHandler(pan);
-    this.arkitController.onUpdateNodeForAnchor = (anchor) {
-      print(anchor);
-    };
-    // this.arkitController.onNodeRotation =
-    //     (rotation) => _onRotationHandler(rotation);
+        body: Stack(children: [
+          ARView(
+            onARViewCreated: onARViewCreated,
+            planeDetectionConfig: PlaneDetectionConfig.horizontalAndVertical,
+          ),
+          Align(
+            alignment: FractionalOffset.bottomCenter,
+            child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton(
+                      onPressed: onRemoveEverything,
+                      child: const Text("Remove Everything")),
+                ]),
+          )
+        ]));
   }
 
-  void _handleAddAnchor(ARKitAnchor anchor) {
-    if (anchor is! ARKitPlaneAnchor) {
-      return;
+  void onARViewCreated(
+      ARSessionManager arSessionManager,
+      ARObjectManager arObjectManager,
+      ARAnchorManager arAnchorManager,
+      ARLocationManager arLocationManager) {
+    this.arSessionManager = arSessionManager;
+    this.arObjectManager = arObjectManager;
+    this.arAnchorManager = arAnchorManager;
+
+    this.arSessionManager!.onInitialize(
+          showFeaturePoints: false,
+          showPlanes: false,
+          showWorldOrigin: false,
+          handlePans: true,
+          handleRotation: true,
+        );
+    this.arObjectManager!.onInitialize();
+
+    this.arSessionManager!.onPlaneOrPointTap = onPlaneOrPointTapped;
+    this.arObjectManager!.onPanStart = onPanStarted;
+    this.arObjectManager!.onPanChange = onPanChanged;
+    this.arObjectManager!.onPanEnd = onPanEnded;
+    this.arObjectManager!.onRotationStart = onRotationStarted;
+    this.arObjectManager!.onRotationChange = onRotationChanged;
+    this.arObjectManager!.onRotationEnd = onRotationEnded;
+  }
+
+  Future<void> onRemoveEverything() async {
+    /*nodes.forEach((node) {
+      this.arObjectManager.removeNode(node);
+    });*/
+    for (final anchor in anchors) {
+      arAnchorManager?.removeAnchor(anchor);
     }
-    _addPlane(arkitController, anchor);
+    anchors = [];
   }
 
-  void _addPlane(ARKitController? controller, ARKitPlaneAnchor anchor) {
-    if (node != null) {
-      controller?.remove(node!.name);
-    }
-    node = ARKitReferenceNode(
-      url: model.path,
-      position: vector.Vector3(0, 0, 0),
-      scale: vector.Vector3(0.002, 0.002, 0.002),
-      eulerAngles: vector.Vector3(0, -math.pi / 2, 0),
-    );
-    controller?.add(node!, parentNodeName: anchor.nodeName);
-  }
-
-  void _updateNode() {
-    ARKitReferenceNode? node = this.node;
-    if (node == null) {
-      return;
-    }
-
-    arkitController.remove(node.name);
-
-    node = ARKitReferenceNode(
-      url: model.path,
-      position: node.position,
-      scale: node.scale,
-      eulerAngles: node.eulerAngles,
-      light: node.light,
-      name: node.name,
-      physicsBody: node.physicsBody,
-      renderingOrder: node.renderingOrder,
-      isHidden: node.isHidden.value,
-    );
-
-    this.node = node;
-    arkitController.add(node);
-
-    // arkitController.update(node.name, node: node);
-  }
-
-  void _onPinchHandler(List<ARKitNodePinchResult> pinch) {
-    final pinchNode = pinch.firstOrNull;
-    if (pinchNode != null) {
-      final scale = 1 - ((1 - pinchNode.scale) * 0.01);
-      final oldScale = node?.scale ?? vector.Vector3.zero();
-      node?.scale = oldScale * scale;
-    }
-  }
-
-  void _onPanHandler(List<ARKitNodePanResult> pan) {
-    final panNode = pan.firstOrNull;
-    if (panNode != null) {
-      final oldPosition = node?.position;
-      final translation = panNode.translation * 0.001;
-      node?.position = vector.Vector3((oldPosition?.x ?? 0) + translation.x,
-          oldPosition?.y ?? 0, (oldPosition?.z ?? 0) + translation.y);
+  Future<void> onPlaneOrPointTapped(
+      List<ARHitTestResult> hitTestResults) async {
+    var singleHitTestResult = hitTestResults.firstWhereOrNull(
+        (hitTestResult) => hitTestResult.type == ARHitTestResultType.plane);
+    if (singleHitTestResult != null) {
+      var newAnchor =
+          ARPlaneAnchor(transformation: singleHitTestResult.worldTransform);
+      bool? didAddAnchor = await arAnchorManager?.addAnchor(newAnchor);
+      if (didAddAnchor == true) {
+        anchors.add(newAnchor);
+        // Add note to anchor
+        var newNode = ARNode(
+            type: NodeType.localGLTF2,
+            uri: "Models/red.gltf",
+            scale: Vector3(0.2, 0.2, 0.2),
+            position: Vector3(0.0, 0.0, 0.0),
+            rotation: Vector4(1.0, 0.0, 0.0, 0.0));
+        bool? didAddNodeToAnchor =
+            await arObjectManager?.addNode(newNode, planeAnchor: newAnchor);
+        if (didAddNodeToAnchor == true) {
+          nodes.add(newNode);
+        } else {
+          arSessionManager?.onError!("Adding Node to Anchor failed");
+        }
+      } else {
+        arSessionManager?.onError!("Adding Anchor failed");
+      }
     }
   }
 
-  void _onRotationHandler(List<ARKitNodeRotationResult> rotation) {
-    final rotationNode = rotation.firstOrNull;
-    if (rotationNode != null) {
-      final oldRotation = node?.eulerAngles ?? vector.Vector3.zero();
-      node?.eulerAngles = vector.Vector3(
-          oldRotation.x + rotationNode.rotation, oldRotation.y, oldRotation.z);
-    }
+  onPanStarted(String nodeName) {
+    print("Started panning node $nodeName");
+  }
+
+  onPanChanged(String nodeName) {
+    print("Continued panning node $nodeName");
+  }
+
+  onPanEnded(String nodeName, Matrix4 newTransform) {
+    print("Ended panning node $nodeName");
+    final pannedNode =
+        this.nodes.firstWhere((element) => element.name == nodeName);
+
+    /*
+    * Uncomment the following command if you want to keep the transformations of the Flutter representations of the nodes up to date
+    * (e.g. if you intend to share the nodes through the cloud)
+    */
+    //pannedNode.transform = newTransform;
+  }
+
+  onRotationStarted(String nodeName) {
+    print("Started rotating node $nodeName");
+  }
+
+  onRotationChanged(String nodeName) {
+    print("Continued rotating node $nodeName");
+  }
+
+  onRotationEnded(String nodeName, Matrix4 newTransform) {
+    print("Ended rotating node $nodeName");
+    final rotatedNode = nodes.firstWhere((element) => element.name == nodeName);
+
+    /*
+    * Uncomment the following command if you want to keep the transformations of the Flutter representations of the nodes up to date
+    * (e.g. if you intend to share the nodes through the cloud)
+    */
+    //rotatedNode.transform = newTransform;
   }
 }
