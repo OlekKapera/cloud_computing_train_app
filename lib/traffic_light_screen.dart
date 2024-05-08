@@ -10,6 +10,7 @@ import 'package:ar_flutter_plugin_flutterflow/models/ar_anchor.dart';
 import 'package:ar_flutter_plugin_flutterflow/models/ar_hittest_result.dart';
 import 'package:ar_flutter_plugin_flutterflow/models/ar_node.dart';
 import 'package:collection/collection.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:vector_math/vector_math_64.dart' as v;
 
@@ -30,10 +31,13 @@ class ObjectGesturesWidgetState extends State<ObjectGesturesWidget> {
 
   final TextEditingController _controller = TextEditingController(text: "");
 
+  bool isObstacleAhead = false;
+
   @override
   void dispose() {
+    arSessionManager?.dispose();
+    _controller.dispose();
     super.dispose();
-    arSessionManager!.dispose();
   }
 
   @override
@@ -61,6 +65,7 @@ class ObjectGesturesWidgetState extends State<ObjectGesturesWidget> {
                     ),
                     textAlign: TextAlign.center,
                     onSubmitted: (text) {
+                      _getDataFromCloud();
                       FocusManager.instance.primaryFocus?.unfocus();
                     },
                   ),
@@ -90,6 +95,24 @@ class ObjectGesturesWidgetState extends State<ObjectGesturesWidget> {
             ),
           ],
         ));
+  }
+
+  Future<void> _getDataFromCloud() async {
+    final dio = Dio();
+    final inputText = _controller.text;
+    final response = await dio.get(
+        'https://us-east1-trainapi-422319.cloudfunctions.net/train-service-dev-first/$inputText');
+    print(response);
+
+    if (response.statusCode != 200) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Something went wrong")));
+      return;
+    }
+
+    setState(() {
+      isObstacleAhead = response.data["hasObstacle"];
+    });
   }
 
   void onARViewCreated(
@@ -142,7 +165,7 @@ class ObjectGesturesWidgetState extends State<ObjectGesturesWidget> {
         // Add note to anchor
         var newNode = ARNode(
             type: NodeType.localGLTF2,
-            uri: "Models/orange.gltf",
+            uri: isObstacleAhead ? "Models/red.gltf" : "Models/green.gltf",
             scale: v.Vector3(0.2, 0.2, 0.2),
             position: v.Vector3(0.0, 0.0, 0.0),
             rotation: v.Vector4(1.0, 0.0, 0.0, 0.0));
